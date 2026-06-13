@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/resultado_calculo.dart';
+import '../services/gestor_storage.dart';
 
 class TalonarioForm extends StatefulWidget {
   final void Function(ResultadoCalculo) onCalcular;
@@ -19,7 +20,35 @@ class _TalonarioFormState extends State<TalonarioForm> {
   final _ultimoCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _precioCtrl.addListener(_guardarBorrador);
+    _primerCtrl.addListener(_guardarBorrador);
+    _ultimoCtrl.addListener(_guardarBorrador);
+    _cargarBorrador();
+  }
+
+  Future<void> _cargarBorrador() async {
+    final borrador = await GestorStorage.cargarBorradorCalculadora();
+    if (!mounted) return;
+    if (borrador['precio']!.isNotEmpty) _precioCtrl.text = borrador['precio']!;
+    if (borrador['primer']!.isNotEmpty) _primerCtrl.text = borrador['primer']!;
+    if (borrador['ultimo']!.isNotEmpty) _ultimoCtrl.text = borrador['ultimo']!;
+  }
+
+  void _guardarBorrador() {
+    GestorStorage.guardarBorradorCalculadora(
+      precio: _precioCtrl.text,
+      primer: _primerCtrl.text,
+      ultimo: _ultimoCtrl.text,
+    ).ignore();
+  }
+
+  @override
   void dispose() {
+    _precioCtrl.removeListener(_guardarBorrador);
+    _primerCtrl.removeListener(_guardarBorrador);
+    _ultimoCtrl.removeListener(_guardarBorrador);
     _precioCtrl.dispose();
     _primerCtrl.dispose();
     _ultimoCtrl.dispose();

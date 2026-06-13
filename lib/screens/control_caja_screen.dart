@@ -70,16 +70,61 @@ class _ControlCajaScreenState extends State<ControlCajaScreen> {
       _rangos = List.generate(tipos.length, (_) => [_RangoEntry()]);
       _loaded = true;
     });
+    await _restaurarBorrador();
+  }
+
+  Future<void> _restaurarBorrador() async {
+    final data = await GestorStorage.cargarBorradorControlCaja();
+    if (data == null || !mounted) return;
+
+    final fechaStr = data['fecha'] as String?;
+    final rangosData = data['rangos'] as Map<String, dynamic>?;
+
+    setState(() {
+      if (fechaStr != null) {
+        _fecha = DateTime.tryParse(fechaStr) ?? _fecha;
+      }
+      if (rangosData != null) {
+        for (int i = 0; i < _tipos.length; i++) {
+          final tipoRangos = rangosData[_tipos[i].id] as List?;
+          if (tipoRangos == null || tipoRangos.isEmpty) continue;
+          for (final r in _rangos[i]) r.dispose();
+          _rangos[i] = [];
+          for (final item in tipoRangos) {
+            final entry = _RangoEntry();
+            final map = item as Map<String, dynamic>;
+            entry.desdeCtrl.text = map['desde'] as String? ?? '';
+            entry.hastaCtrl.text = map['hasta'] as String? ?? '';
+            _rangos[i].add(entry);
+          }
+        }
+      }
+    });
+  }
+
+  void _guardarBorrador() {
+    final rangosMap = <String, List<Map<String, String>>>{};
+    for (int i = 0; i < _tipos.length; i++) {
+      rangosMap[_tipos[i].id] = _rangos[i]
+          .map((r) => {'desde': r.desdeCtrl.text, 'hasta': r.hastaCtrl.text})
+          .toList();
+    }
+    GestorStorage.guardarBorradorControlCaja(
+      fecha: _fecha,
+      rangos: rangosMap,
+    ).ignore();
   }
 
   void _agregarRango(int tipoIdx) {
     setState(() => _rangos[tipoIdx].add(_RangoEntry()));
+    _guardarBorrador();
   }
 
   void _eliminarRango(int tipoIdx, int rangoIdx) {
     final entry = _rangos[tipoIdx][rangoIdx];
     setState(() => _rangos[tipoIdx].removeAt(rangoIdx));
     entry.dispose();
+    _guardarBorrador();
   }
 
   double _subtotalTipo(int i) =>
@@ -104,6 +149,7 @@ class _ControlCajaScreenState extends State<ControlCajaScreen> {
       }
       _rangos = List.generate(_tipos.length, (_) => [_RangoEntry()]);
     });
+    GestorStorage.limpiarBorradorControlCaja().ignore();
   }
 
   Future<void> _guardar() async {
@@ -160,7 +206,10 @@ class _ControlCajaScreenState extends State<ControlCajaScreen> {
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
     );
-    if (picked != null && mounted) setState(() => _fecha = picked);
+    if (picked != null && mounted) {
+      setState(() => _fecha = picked);
+      _guardarBorrador();
+    }
   }
 
   @override
@@ -218,7 +267,7 @@ class _ControlCajaScreenState extends State<ControlCajaScreen> {
                           tipo: _tipos[i],
                           rangos: _rangos[i],
                           subtotal: _subtotalTipo(i),
-                          onChanged: () => setState(() {}),
+                          onChanged: () { setState(() {}); _guardarBorrador(); },
                           onAgregarRango: () => _agregarRango(i),
                           onEliminarRango: (j) => _eliminarRango(i, j),
                         ),
