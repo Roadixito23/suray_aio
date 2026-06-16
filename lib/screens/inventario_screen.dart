@@ -28,8 +28,10 @@ class _InventarioScreenState extends State<InventarioScreen> {
   }
 
   Future<void> _cargarDatos() async {
+    await GestorStorage.migrarColoresPredefinidos();
     final categorias = await GestorStorage.cargarCategorias();
     final tipos = await GestorStorage.cargarTipos(categorias);
+    await GestorStorage.migrarTalonariosAInventario(tipos);
     final items = await GestorStorage.cargarInventario(tipos);
     if (!mounted) return;
     setState(() {

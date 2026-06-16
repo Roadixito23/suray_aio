@@ -114,6 +114,78 @@ class GestorStorage {
     return result;
   }
 
+  // ── Migraciones ────────────────────────────────────────────────────────────
+
+  /// Migra talonarios del gestor al inventario (operación única).
+  /// Llamar antes de cargarInventario al iniciar la pantalla de inventario.
+  static Future<void> migrarTalonariosAInventario(
+    List<TipoTalonario> tipos,
+  ) async {
+    final p = await SharedPreferences.getInstance();
+    final rawTal = p.getString(_kTalonarios);
+    if (rawTal == null) return;
+
+    final inventarioActual = await cargarInventario(tipos);
+    final existingIds = inventarioActual.map((i) => i.id).toSet();
+
+    for (final j in jsonDecode(rawTal) as List) {
+      try {
+        final tal = Talonario.fromJson(j as Map<String, dynamic>, tipos);
+        if (!existingIds.contains(tal.id)) {
+          inventarioActual.add(ItemInventario(
+            id: tal.id,
+            tipo: tal.tipo,
+            numero: tal.numero,
+            estado: EstadoInventario.enStock,
+          ));
+        }
+      } catch (_) {}
+    }
+
+    await guardarInventario(inventarioActual);
+    await p.remove(_kTalonarios);
+  }
+
+  /// Asegura que las categorías y tipos predefinidos tengan los colores correctos.
+  /// Llama a esto al iniciar la app para migrar datos existentes.
+  static Future<void> migrarColoresPredefinidos() async {
+    final p = await SharedPreferences.getInstance();
+    if (p.getBool('_migrated_colors_v1') == true) return;
+
+    final categorias = await cargarCategorias();
+    bool catChanged = false;
+    for (final predCat in CategoriaTalonario.predefinidas) {
+      if (!categorias.any((c) => c.id == predCat.id)) {
+        categorias.add(predCat);
+        catChanged = true;
+      }
+    }
+    if (catChanged) await guardarCategorias(categorias);
+
+    final tipos = await cargarTipos(categorias);
+    bool tiposChanged = false;
+    for (int i = 0; i < tipos.length; i++) {
+      if (!tipos[i].esPredefinido) continue;
+      final predTipo = TipoTalonario.predefinidos.cast<TipoTalonario?>().firstWhere(
+        (pt) => pt!.id == tipos[i].id,
+        orElse: () => null,
+      );
+      if (predTipo != null && predTipo.categoria.id != tipos[i].categoria.id) {
+        tipos[i] = TipoTalonario(
+          id: tipos[i].id,
+          boletos: tipos[i].boletos,
+          precio: tipos[i].precio,
+          categoria: predTipo.categoria,
+          esPredefinido: tipos[i].esPredefinido,
+        );
+        tiposChanged = true;
+      }
+    }
+    if (tiposChanged) await guardarTipos(tipos);
+
+    await p.setBool('_migrated_colors_v1', true);
+  }
+
   // ── Historial ──────────────────────────────────────────────────────────────
 
   static Future<void> guardarHistorial(List<SobreHistorial> historial) async {

@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/categoria_talonario.dart';
-import '../models/talonario.dart';
 import '../models/tipo_talonario.dart';
 import '../services/gestor_storage.dart';
 import '../theme/app_theme.dart';
 import '../utils/currency_formatter.dart';
 
 const _paletaColores = [
+  Color(0xFFD32F2F), // Rojo
+  Color(0xFF388E3C), // Verde
+  Color(0xFF1976D2), // Azul
   AppColors.burdeo,
   AppColors.azulMarino,
   AppColors.hunterGreen,
@@ -34,13 +36,12 @@ class _GestorScreenState extends State<GestorScreen>
 
   final List<TipoTalonario> _tipos = [];
   final List<CategoriaTalonario> _categorias = [];
-  final List<Talonario> _talonarios = [];
   bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this)
+    _tabController = TabController(length: 2, vsync: this)
       ..addListener(() => setState(() {}));
     _cargarDatos();
   }
@@ -54,7 +55,6 @@ class _GestorScreenState extends State<GestorScreen>
   Future<void> _cargarDatos() async {
     final categorias = await GestorStorage.cargarCategorias();
     final tipos = await GestorStorage.cargarTipos(categorias);
-    final talonarios = await GestorStorage.cargarTalonarios(tipos);
     if (!mounted) return;
     setState(() {
       _categorias
@@ -63,9 +63,6 @@ class _GestorScreenState extends State<GestorScreen>
       _tipos
         ..clear()
         ..addAll(tipos);
-      _talonarios
-        ..clear()
-        ..addAll(talonarios);
       _loaded = true;
     });
   }
@@ -74,29 +71,7 @@ class _GestorScreenState extends State<GestorScreen>
     Future.wait([
       GestorStorage.guardarCategorias(_categorias),
       GestorStorage.guardarTipos(_tipos),
-      GestorStorage.guardarTalonarios(_talonarios),
     ]).ignore();
-  }
-
-  // ── CRUD Talonarios ──────────────────────────────────────────────────────────
-
-  void _crearTalonario(Talonario t) {
-    setState(() => _talonarios.add(t));
-    _guardarTodo();
-  }
-
-  void _editarTalonario(Talonario old, Talonario nuevo) {
-    final idx = _talonarios.indexWhere((t) => t.id == old.id);
-    if (idx == -1) return;
-    setState(() => _talonarios[idx] = nuevo);
-    _guardarTodo();
-  }
-
-  Future<void> _eliminarTalonario(Talonario t) async {
-    final ok = await _confirmar('¿Eliminar el talonario N° ${t.numero}?');
-    if (ok != true || !mounted) return;
-    setState(() => _talonarios.removeWhere((e) => e.id == t.id));
-    _guardarTodo();
   }
 
   // ── CRUD Categorías ──────────────────────────────────────────────────────────
@@ -150,29 +125,11 @@ class _GestorScreenState extends State<GestorScreen>
   void _editarTipo(TipoTalonario old, TipoTalonario nuevo) {
     final idx = _tipos.indexWhere((t) => t.id == old.id);
     if (idx == -1) return;
-    setState(() {
-      _tipos[idx] = nuevo;
-      for (int i = 0; i < _talonarios.length; i++) {
-        if (_talonarios[i].tipo.id == old.id) {
-          _talonarios[i] = Talonario(
-            id: _talonarios[i].id,
-            numero: _talonarios[i].numero,
-            tipo: nuevo,
-          );
-        }
-      }
-    });
+    setState(() => _tipos[idx] = nuevo);
     _guardarTodo();
   }
 
   Future<void> _eliminarTipo(TipoTalonario tipo) async {
-    final n = _talonarios.where((t) => t.tipo.id == tipo.id).length;
-    if (n > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('No se puede eliminar: $n talonario${n == 1 ? '' : 's'} lo usan'),
-      ));
-      return;
-    }
     final ok = await _confirmar(
         '¿Eliminar el tipo "${tipo.boletos} boletos × ${formatPesos(tipo.precio)}"?');
     if (ok != true || !mounted) return;
@@ -220,19 +177,8 @@ class _GestorScreenState extends State<GestorScreen>
   void _onFabPressed() {
     switch (_tabController.index) {
       case 0:
-        if (_tipos.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Primero creá al menos un tipo de talonario'),
-          ));
-          return;
-        }
-        _mostrarSheet((_) => _TalonarioSheet(
-              tipos: _tipos,
-              onGuardar: _crearTalonario,
-            ));
-      case 1:
         _mostrarSheet((_) => _CategoriaSheet(onGuardar: _crearCategoria));
-      case 2:
+      case 1:
         _mostrarSheet((_) => _TipoSheet(
               categorias: _categorias,
               onGuardar: _crearTipo,
@@ -240,7 +186,7 @@ class _GestorScreenState extends State<GestorScreen>
     }
   }
 
-  static const _fabLabels = ['Talonario', 'Categoría', 'Tipo'];
+  static const _fabLabels = ['Categoría', 'Tipo'];
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +196,6 @@ class _GestorScreenState extends State<GestorScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(icon: Icon(Icons.list_alt_outlined), text: 'Talonarios'),
             Tab(icon: Icon(Icons.label_outline), text: 'Categorías'),
             Tab(icon: Icon(Icons.style_outlined), text: 'Tipos'),
           ],
@@ -268,13 +213,6 @@ class _GestorScreenState extends State<GestorScreen>
           : TabBarView(
               controller: _tabController,
               children: [
-                _TalonariosTab(
-                  talonarios: _talonarios,
-                  tipos: _tipos,
-                  mostrarSheet: _mostrarSheet,
-                  onEditar: _editarTalonario,
-                  onEliminar: _eliminarTalonario,
-                ),
                 _CategoriasTab(
                   categorias: _categorias,
                   mostrarSheet: _mostrarSheet,
@@ -290,52 +228,6 @@ class _GestorScreenState extends State<GestorScreen>
                 ),
               ],
             ),
-    );
-  }
-}
-
-// ─── Tab: Talonarios ──────────────────────────────────────────────────────────
-
-class _TalonariosTab extends StatelessWidget {
-  final List<Talonario> talonarios;
-  final List<TipoTalonario> tipos;
-  final void Function(WidgetBuilder) mostrarSheet;
-  final void Function(Talonario, Talonario) onEditar;
-  final Future<void> Function(Talonario) onEliminar;
-
-  const _TalonariosTab({
-    required this.talonarios,
-    required this.tipos,
-    required this.mostrarSheet,
-    required this.onEditar,
-    required this.onEliminar,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (talonarios.isEmpty) {
-      return const _EstadoVacio(
-        icon: Icons.list_alt_outlined,
-        mensaje: 'Sin talonarios',
-        subtitulo: 'Tocá + para agregar uno',
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: talonarios.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (_, i) {
-        final t = talonarios[i];
-        return _TalonarioCard(
-          talonario: t,
-          onEditar: () => mostrarSheet((_) => _TalonarioSheet(
-                tipos: tipos,
-                editando: t,
-                onGuardar: (nuevo) => onEditar(t, nuevo),
-              )),
-          onEliminar: () => onEliminar(t),
-        );
-      },
     );
   }
 }
@@ -377,17 +269,13 @@ class _CategoriasTab extends StatelessWidget {
           child: ListTile(
             leading: CircleAvatar(backgroundColor: cat.color, radius: 14),
             title: Text(cat.nombre),
-            trailing: cat.esPredefinida
-                ? Icon(Icons.lock_outline,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.outline)
-                : _AccionesMenu(
-                    onEditar: () => mostrarSheet((_) => _CategoriaSheet(
-                          editando: cat,
-                          onGuardar: (nueva) => onEditar(cat, nueva),
-                        )),
-                    onEliminar: () => onEliminar(cat),
-                  ),
+            trailing: _AccionesMenu(
+              onEditar: () => mostrarSheet((_) => _CategoriaSheet(
+                    editando: cat,
+                    onGuardar: (nueva) => onEditar(cat, nueva),
+                  )),
+              onEliminar: () => onEliminar(cat),
+            ),
           ),
         );
       },
@@ -427,26 +315,23 @@ class _TiposTab extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (_, i) {
         final tipo = tipos[i];
+        final color = tipo.categoria.color;
         return Card(
           elevation: 0,
           color: Theme.of(context).colorScheme.surfaceContainerLow,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ListTile(
-            leading: CircleAvatar(backgroundColor: tipo.categoria.color, radius: 14),
+            leading: CircleAvatar(backgroundColor: color, radius: 14),
             title: Text('${tipo.boletos} boletos × ${formatPesos(tipo.precio)}'),
             subtitle: Text(tipo.categoria.nombre),
-            trailing: tipo.esPredefinido
-                ? Icon(Icons.lock_outline,
-                    size: 16,
-                    color: Theme.of(context).colorScheme.outline)
-                : _AccionesMenu(
-                    onEditar: () => mostrarSheet((_) => _TipoSheet(
-                          categorias: categorias,
-                          editando: tipo,
-                          onGuardar: (nuevo) => onEditar(tipo, nuevo),
-                        )),
-                    onEliminar: () => onEliminar(tipo),
-                  ),
+            trailing: _AccionesMenu(
+              onEditar: () => mostrarSheet((_) => _TipoSheet(
+                    categorias: categorias,
+                    editando: tipo,
+                    onGuardar: (nuevo) => onEditar(tipo, nuevo),
+                  )),
+              onEliminar: () => onEliminar(tipo),
+            ),
           ),
         );
       },
@@ -530,75 +415,6 @@ class _EstadoVacio extends StatelessWidget {
   }
 }
 
-int _colorR(Color c) => (c.r * 255).round();
-int _colorG(Color c) => (c.g * 255).round();
-int _colorB(Color c) => (c.b * 255).round();
-
-class _TalonarioCard extends StatelessWidget {
-  final Talonario talonario;
-  final VoidCallback onEditar;
-  final VoidCallback onEliminar;
-
-  const _TalonarioCard({
-    required this.talonario,
-    required this.onEditar,
-    required this.onEliminar,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cat = talonario.tipo.categoria;
-    final tipo = talonario.tipo;
-
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Color.fromARGB(
-              38, _colorR(cat.color), _colorG(cat.color), _colorB(cat.color)),
-          child: Icon(Icons.book_outlined, color: cat.color, size: 20),
-        ),
-        title: Text('N° ${talonario.numero}', style: theme.textTheme.titleSmall),
-        subtitle: Text('${tipo.boletos} boletos × ${formatPesos(tipo.precio)}',
-            style: theme.textTheme.bodySmall),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _CategoriaChip(categoria: cat),
-            const SizedBox(width: 4),
-            _AccionesMenu(onEditar: onEditar, onEliminar: onEliminar),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CategoriaChip extends StatelessWidget {
-  final CategoriaTalonario categoria;
-  const _CategoriaChip({required this.categoria});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Color.fromARGB(30, _colorR(categoria.color), _colorG(categoria.color),
-            _colorB(categoria.color)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        categoria.nombre,
-        style: TextStyle(
-            color: categoria.color, fontSize: 11, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
 // ─── Sheet compartidos ────────────────────────────────────────────────────────
 
 class _SheetHandle extends StatelessWidget {
@@ -616,153 +432,6 @@ class _SheetHandle extends StatelessWidget {
           ),
         ),
       );
-}
-
-// ─── Sheet: Talonario (crear / editar) ───────────────────────────────────────
-
-class _TalonarioSheet extends StatefulWidget {
-  final List<TipoTalonario> tipos;
-  final Talonario? editando;
-  final void Function(Talonario) onGuardar;
-
-  const _TalonarioSheet({
-    required this.tipos,
-    required this.onGuardar,
-    this.editando,
-  });
-
-  @override
-  State<_TalonarioSheet> createState() => _TalonarioSheetState();
-}
-
-class _TalonarioSheetState extends State<_TalonarioSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _numeroCtrl = TextEditingController();
-  late TipoTalonario _tipoSel;
-
-  bool get _esEdicion => widget.editando != null;
-
-  @override
-  void initState() {
-    super.initState();
-    _tipoSel = widget.editando?.tipo ?? widget.tipos.first;
-    if (_esEdicion) _numeroCtrl.text = widget.editando!.numero;
-  }
-
-  @override
-  void dispose() {
-    _numeroCtrl.dispose();
-    super.dispose();
-  }
-
-  void _guardar() {
-    if (!_formKey.currentState!.validate()) return;
-    final talonario = Talonario(
-      id: widget.editando?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      numero: _numeroCtrl.text.trim(),
-      tipo: _tipoSel,
-    );
-    Navigator.pop(context);
-    widget.onGuardar(talonario);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Form(
-      key: _formKey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _SheetHandle(),
-          Text(_esEdicion ? 'Editar talonario' : 'Nuevo talonario',
-              style: theme.textTheme.titleLarge),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _numeroCtrl,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              labelText: 'Número de talonario',
-              prefixIcon: Icon(Icons.tag),
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Campo obligatorio' : null,
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<TipoTalonario>(
-            initialValue: _tipoSel,
-            decoration: const InputDecoration(
-              labelText: 'Tipo de talonario',
-              prefixIcon: Icon(Icons.style_outlined),
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            items: widget.tipos
-                .map((t) => DropdownMenuItem(
-                      value: t,
-                      child: Text('${t.boletos} boletos × ${formatPesos(t.precio)}'),
-                    ))
-                .toList(),
-            onChanged: (v) => setState(() => _tipoSel = v!),
-          ),
-          const SizedBox(height: 12),
-          _CategoriaDerivada(categoria: _tipoSel.categoria, theme: theme),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _guardar,
-            icon: Icon(_esEdicion ? Icons.save_outlined : Icons.add),
-            label: Text(_esEdicion ? 'Guardar cambios' : 'Guardar'),
-            style:
-                FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CategoriaDerivada extends StatelessWidget {
-  final CategoriaTalonario categoria;
-  final ThemeData theme;
-  const _CategoriaDerivada({required this.categoria, required this.theme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.label_outline, size: 20, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Categoría asignada',
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  CircleAvatar(backgroundColor: categoria.color, radius: 6),
-                  const SizedBox(width: 6),
-                  Text(categoria.nombre, style: theme.textTheme.bodyMedium),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ─── Sheet: Categoría (crear / editar) ───────────────────────────────────────
@@ -841,6 +510,7 @@ class _CategoriaSheetState extends State<_CategoriaSheet> {
           const SizedBox(height: 8),
           Wrap(
             spacing: 12,
+            runSpacing: 10,
             children: _paletaColores
                 .map((c) => GestureDetector(
                       onTap: () => setState(() => _colorSel = c),
@@ -999,7 +669,7 @@ class _TipoSheetState extends State<_TipoSheet> {
           DropdownButtonFormField<CategoriaTalonario>(
             initialValue: _categoriaSel,
             decoration: const InputDecoration(
-              labelText: 'Categoría',
+              labelText: 'Categoría / Color',
               prefixIcon: Icon(Icons.label_outline),
               border: OutlineInputBorder(),
               isDense: true,
