@@ -161,4 +161,59 @@ class GestorStorage {
     }
     return result;
   }
+
+  // ── Borrador Calculadora ───────────────────────────────────────────────────
+
+  static const _kBorradorCalculadora = 'borrador_calculadora';
+
+  static Future<void> guardarBorradorCalculadora({
+    required String precio,
+    required String primer,
+    required String ultimo,
+  }) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(
+      _kBorradorCalculadora,
+      jsonEncode({'precio': precio, 'primer': primer, 'ultimo': ultimo}),
+    );
+  }
+
+  static Future<Map<String, String>> cargarBorradorCalculadora() async {
+    final p = await SharedPreferences.getInstance();
+    final raw = p.getString(_kBorradorCalculadora);
+    if (raw == null) return {'precio': '', 'primer': '', 'ultimo': ''};
+    final map = jsonDecode(raw) as Map<String, dynamic>;
+    return {
+      'precio': map['precio'] as String? ?? '',
+      'primer': map['primer'] as String? ?? '',
+      'ultimo': map['ultimo'] as String? ?? '',
+    };
+  }
+
+  // ── Borrador Control de Caja ───────────────────────────────────────────────
+
+  static const _kBorradorControlCaja = 'borrador_control_caja';
+
+  static Future<void> guardarBorradorControlCaja({
+    required DateTime fecha,
+    required Map<String, List<Map<String, String>>> rangos,
+  }) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(
+      _kBorradorControlCaja,
+      jsonEncode({'fecha': fecha.toIso8601String(), 'rangos': rangos}),
+    );
+  }
+
+  static Future<Map<String, dynamic>?> cargarBorradorControlCaja() async {
+    final p = await SharedPreferences.getInstance();
+    final raw = p.getString(_kBorradorControlCaja);
+    if (raw == null) return null;
+    return jsonDecode(raw) as Map<String, dynamic>;
+  }
+
+  static Future<void> limpiarBorradorControlCaja() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove(_kBorradorControlCaja);
+  }
 }
