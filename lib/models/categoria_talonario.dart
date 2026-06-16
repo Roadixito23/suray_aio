@@ -20,7 +20,33 @@ class CategoriaTalonario {
     esPredefinida: true,
   );
 
-  static const List<CategoriaTalonario> predefinidas = [lunesASabado];
+  static const rojo = CategoriaTalonario(
+    id: '_pre_rojo',
+    nombre: 'Rojo',
+    color: Color(0xFFD32F2F),
+    esPredefinida: true,
+  );
+
+  static const verde = CategoriaTalonario(
+    id: '_pre_verde',
+    nombre: 'Verde',
+    color: Color(0xFF388E3C),
+    esPredefinida: true,
+  );
+
+  static const azul = CategoriaTalonario(
+    id: '_pre_azul',
+    nombre: 'Azul',
+    color: Color(0xFF1976D2),
+    esPredefinida: true,
+  );
+
+  static const List<CategoriaTalonario> predefinidas = [
+    lunesASabado,
+    rojo,
+    verde,
+    azul,
+  ];
 
   Map<String, dynamic> toJson() => {
     'id': id,
